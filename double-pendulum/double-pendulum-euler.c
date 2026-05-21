@@ -5,6 +5,7 @@
 #define WIDTH 1200
 #define HEIGHT 900
 #define FPS 120
+#define NUM_TRACES 5000
 
 const int samplingSteps = 10;
 
@@ -24,13 +25,15 @@ typedef struct PhysicParams{
     float dt;           // Timestep 
 }PhysicParams;
 
+typedef struct Trace{
+    Vector2 points[NUM_TRACES];
+    int count;
+}Trace;
+
 float calcTheta_ddot1(PendulumParams* penP, PhysicParams* phyP);
 float calcTheta_ddot2(PendulumParams* penP, PhysicParams* phyP);
-void updateTheta_dot1(PendulumParams* penP, PhysicParams* phyP);
-void updateTheta_dot2(PendulumParams* penP, PhysicParams* phyP);
-void updateTheta1(PhysicParams* phyP);
-void updateTheta2(PhysicParams* phyP);
-void drawPendulum(PendulumParams* penP, PhysicParams* phyP);    
+void drawPendulum(PendulumParams* penP, PhysicParams* phyP, Trace* t);    
+
 
 Vector2 origin = {WIDTH / 2, 100};    // Fix position for rod 1
 
@@ -38,8 +41,9 @@ int main(){
     InitWindow(WIDTH, HEIGHT, "Double Pendulum");
     SetTargetFPS(FPS);
 
-    PendulumParams penP = {.m1 = 20.0f, .m2 = 20.0f, .l1 = 120.0f, .l2 = 120.0f};
+    PendulumParams penP = {.m1 = 20.0f, .m2 = 20.0f, .l1 = 200.0f, .l2 = 200.0f};
     PhysicParams phyP = {.g = 981.0f, .theta1 = 0.4f, .theta2 = 2.4f, .theta_dot1 = 0.0f, .theta_dot2 = 0.0f, .dt = 0.001};
+    Trace trace = {.count = 0};
 
     while(!WindowShouldClose()){
         for(int i = 0; i < samplingSteps; i++){
@@ -54,8 +58,17 @@ int main(){
         }
 
         BeginDrawing();
+     
         ClearBackground(BLACK);
-        drawPendulum(&penP, &phyP);
+        for(size_t i = 1; i < trace.count; i++){
+            float alpha = (float)i / trace.count;
+            DrawLineV(trace.points[i-1], trace.points[i], Fade(WHITE, alpha));
+        }
+        drawPendulum(&penP, &phyP, &trace);
+
+
+
+
         EndDrawing();
     }
 
@@ -108,29 +121,7 @@ float calcTheta_ddot2(PendulumParams* penP, PhysicParams* phyP){
     return numerator / denominator;
 }
 
-/*
-void updateTheta_dot1(PendulumParams* penP, PhysicParams* phyP){
-    float theta_ddot1 = calcTheta_ddot1(penP, phyP);
-    phyP->theta_dot1 = phyP->theta_dot1+theta_ddot1*phyP->dt;
-    // theta_dot1 *= 0.9999f;
-}
-
-void updateTheta_dot2(PendulumParams* penP, PhysicParams* phyP){
-    float theta_ddot2 = calcTheta_ddot2(penP, phyP);
-    phyP->theta_dot2 = phyP->theta_dot2+theta_ddot2*phyP->dt;
-    // theta_dot2 *= 0.9999f;
-}
-
-void updateTheta1(PhysicParams* phyP){
-    phyP->theta1 = phyP->theta1+phyP->theta_dot1*phyP->dt;
-}
-
-void updateTheta2(PhysicParams* phyP){
-    phyP->theta2 = phyP->theta2+phyP->theta_dot2*phyP->dt;
-}
-*/
-
-void drawPendulum(PendulumParams* penP, PhysicParams* phyP){
+void drawPendulum(PendulumParams* penP, PhysicParams* phyP, Trace* t){
     // Rod 1 position update
     float x1_pos = origin.x+penP->l1*sinf(phyP->theta1);
     float y1_pos = origin.y+penP->l1*cosf(phyP->theta1);
@@ -147,5 +138,10 @@ void drawPendulum(PendulumParams* penP, PhysicParams* phyP){
     // Mass 1
     DrawCircle((int)x1_pos, (int)y1_pos, (int)penP->m1, RED);    
     // Mass 2                      
-    DrawCircle((int)x2_pos, (int)y2_pos, (int)penP->m2, YELLOW);                          
+    DrawCircle((int)x2_pos, (int)y2_pos, (int)penP->m2, YELLOW);   
+    
+    // Trace
+    t->points[t->count++] = (Vector2){x2_pos, y2_pos};
+    if(t->count > NUM_TRACES) t->count = 0;
 }
+
