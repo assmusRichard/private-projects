@@ -6,29 +6,31 @@
 #define HEIGHT 900
 #define FPS 120
 
-int samplingSteps = 15;
-float m1 = 30.0f;                  // Mass 1
-float m2 = 40.0f;                  // Mass 2
-float l1 = 200.0f;                  // Length 1
-float l2 = 200.0f;                 // Length 2
-float g = 9.81f;                     // Gravitational constant 
-float theta1 = 0.1f;
-float theta2 = 3.0f;
-float theta_dot1 = 0.0f;            // Angle velocity 1
-float theta_dot2 = 0.0f;            // Angle velocity 2
-float theta_ddot1;                  // Angle acceleration 1
-float theta_ddot2;                  // Angle acceleration 2
-float dt = 0.008;                  // Time step
-float x1_pos, y1_pos;
-float x2_pos, y2_pos;
+const int samplingSteps = 10;
 
-float calcTheta_ddot1();
-float calcTheta_ddot2();
-void updateTheta_dot1();
-void updateTheta_dot2();
-void updateTheta1();
-void updateTheta2();
-void drawPendulum();    
+typedef struct PendulumParams{
+    float m1;           // Mass 1
+    float m2;           // Mass 2
+    float l1;           // Length 1
+    float l2;           // Length 2
+}PendulumParams;
+
+typedef struct PhysicParams{
+    float g;            // Gravitational constant 
+    float theta1;       // Angle 1
+    float theta2;       // Angle 2
+    float theta_dot1;   // Angle velocity 1
+    float theta_dot2;   // Angle velocity 2
+    float dt;           // Timestep 
+}PhysicParams;
+
+float calcTheta_ddot1(PendulumParams* penP, PhysicParams* phyP);
+float calcTheta_ddot2(PendulumParams* penP, PhysicParams* phyP);
+void updateTheta_dot1(PendulumParams* penP, PhysicParams* phyP);
+void updateTheta_dot2(PendulumParams* penP, PhysicParams* phyP);
+void updateTheta1(PhysicParams* phyP);
+void updateTheta2(PhysicParams* phyP);
+void drawPendulum(PendulumParams* penP, PhysicParams* phyP);    
 
 Vector2 origin = {WIDTH / 2, 100};    // Fix position for rod 1
 
@@ -36,18 +38,24 @@ int main(){
     InitWindow(WIDTH, HEIGHT, "Double Pendulum");
     SetTargetFPS(FPS);
 
+    PendulumParams penP = {.m1 = 20.0f, .m2 = 20.0f, .l1 = 120.0f, .l2 = 120.0f};
+    PhysicParams phyP = {.g = 981.0f, .theta1 = 0.4f, .theta2 = 2.4f, .theta_dot1 = 0.0f, .theta_dot2 = 0.0f, .dt = 0.001};
+
     while(!WindowShouldClose()){
         for(int i = 0; i < samplingSteps; i++){
-            updateTheta_dot1();
-            updateTheta_dot2();
-            updateTheta1();
-            updateTheta2();
+            float theta_ddot1 = calcTheta_ddot1(&penP, &phyP);
+            float theta_ddot2 = calcTheta_ddot2(&penP, &phyP);
+
+            phyP.theta_dot1 += theta_ddot1 * phyP.dt;
+            phyP.theta_dot2 += theta_ddot2 * phyP.dt;
+
+            phyP.theta1 += phyP.theta_dot1 * phyP.dt;
+            phyP.theta2 += phyP.theta_dot2 * phyP.dt;
         }
 
         BeginDrawing();
         ClearBackground(BLACK);
-        drawPendulum();
-        
+        drawPendulum(&penP, &phyP);
         EndDrawing();
     }
 
@@ -56,67 +64,88 @@ int main(){
     return 0;
 }
 
-float calcTheta_ddot1(){
+float calcTheta_ddot1(PendulumParams* penP, PhysicParams* phyP){
     float numerator;
     float denominator;
 
-    numerator = -g*(m1+m2)*sinf(theta1)-m2*g*sinf(theta1-2*theta2)-2*sinf(theta1-theta2)*(m2*l2*theta_dot1*theta_dot1+(m1+m2)*l1*theta_dot1*theta_dot1*cosf(theta1-theta2));
+    float theta1 = phyP->theta1;
+    float theta2 = phyP->theta2;
+    float theta_dot1 = phyP->theta_dot1;
+    float theta_dot2 = phyP->theta_dot2;
+    float g = phyP->g;
+    float m1 = penP->m1;
+    float m2 = penP->m2;
+    float l1 = penP->l1;
+    float l2 = penP->l2;
+
+    numerator = -g*(m1+m2)*sinf(theta1)-m2*g*sinf(theta1-2*theta2)-2*sinf(theta1-theta2)*(m2*l2*theta_dot2*theta_dot2+(m1+m2)*l1*theta_dot1*theta_dot1*cosf(theta1-theta2));
     denominator = l1*(2*m1+m2-m2*cosf(2*theta1-2*theta2));
 
-    if (fabsf(denominator) < 0.001f) denominator = 0.001f;
+    if (fabsf(denominator) < 0.001f) denominator = copysignf(0.001f, denominator);
 
     return numerator / denominator;
 }
 
-float calcTheta_ddot2(){
+float calcTheta_ddot2(PendulumParams* penP, PhysicParams* phyP){
     float numerator;
     float denominator;
+
+    float theta1 = phyP->theta1;
+    float theta2 = phyP->theta2;
+    float theta_dot1 = phyP->theta_dot1;
+    float theta_dot2 = phyP->theta_dot2;
+    float g = phyP->g;
+    float m1 = penP->m1;
+    float m2 = penP->m2;
+    float l1 = penP->l1;
+    float l2 = penP->l2;
 
     numerator = 2*sinf(theta1-theta2)*((m1+m2)*l1*theta_dot1*theta_dot1+g*(m1+m2)*cosf(theta1)+m2*l2*theta_dot2*theta_dot2*cosf(theta1-theta2));
     denominator = l2*(2*m1+m2-m2*cosf(2*theta1-2*theta2));
 
-    if (fabsf(denominator) < 0.001f) denominator = 0.001f;
+    if (fabsf(denominator) < 0.001f) denominator = copysignf(0.001f, denominator);
 
     return numerator / denominator;
 }
 
-void updateTheta_dot1(){
-    theta_ddot1 = calcTheta_ddot1();
-    theta_dot1 = theta_dot1+theta_ddot1*dt;
-    theta_dot1 *= 0.9999f;
+/*
+void updateTheta_dot1(PendulumParams* penP, PhysicParams* phyP){
+    float theta_ddot1 = calcTheta_ddot1(penP, phyP);
+    phyP->theta_dot1 = phyP->theta_dot1+theta_ddot1*phyP->dt;
+    // theta_dot1 *= 0.9999f;
 }
 
-void updateTheta_dot2(){
-    theta_ddot2 = calcTheta_ddot2();
-    theta_dot2 = theta_dot2+theta_ddot2*dt;
-    theta_dot2 *= 0.9999f;
+void updateTheta_dot2(PendulumParams* penP, PhysicParams* phyP){
+    float theta_ddot2 = calcTheta_ddot2(penP, phyP);
+    phyP->theta_dot2 = phyP->theta_dot2+theta_ddot2*phyP->dt;
+    // theta_dot2 *= 0.9999f;
 }
 
-void updateTheta1(){
-    theta1 = theta1+theta_dot1*dt;
+void updateTheta1(PhysicParams* phyP){
+    phyP->theta1 = phyP->theta1+phyP->theta_dot1*phyP->dt;
 }
 
-void updateTheta2(){
-    theta2 = theta2+theta_dot2*dt;
+void updateTheta2(PhysicParams* phyP){
+    phyP->theta2 = phyP->theta2+phyP->theta_dot2*phyP->dt;
 }
+*/
 
-
-void drawPendulum(){
+void drawPendulum(PendulumParams* penP, PhysicParams* phyP){
     // Rod 1 position update
-    x1_pos = origin.x+l1*sinf(theta1);
-    y1_pos = origin.y+l1*cosf(theta1);
+    float x1_pos = origin.x+penP->l1*sinf(phyP->theta1);
+    float y1_pos = origin.y+penP->l1*cosf(phyP->theta1);
 
     // Rod 2 position update
-    x2_pos = x1_pos+l2*sinf(theta2);
-    y2_pos = y1_pos+l2*cosf(theta2);
+    float x2_pos = x1_pos+penP->l2*sinf(phyP->theta2);
+    float y2_pos = y1_pos+penP->l2*cosf(phyP->theta2);
 
     // Rod 1
     DrawLineEx(origin, (Vector2){x1_pos, y1_pos}, 2.0f, WHITE);    
     // Rod 2         
-    DrawLineEx((Vector2){x1_pos, y1_pos}, (Vector2){x2_pos, y2_pos}, 2.0, WHITE);  
+    DrawLineEx((Vector2){x1_pos, y1_pos}, (Vector2){x2_pos, y2_pos}, 2.0f, WHITE);  
 
     // Mass 1
-    DrawCircle((int)x1_pos, (int)y1_pos, (int)m1/2, RED);    
+    DrawCircle((int)x1_pos, (int)y1_pos, (int)penP->m1, RED);    
     // Mass 2                      
-    DrawCircle((int)x2_pos, (int)y2_pos, (int)m2/2, YELLOW);                          
+    DrawCircle((int)x2_pos, (int)y2_pos, (int)penP->m2, YELLOW);                          
 }
