@@ -28,7 +28,7 @@ typedef struct Trace{
 void verletSpeed(State* s, Params* p);
 void calcAcceleration(State* s, Params* p);
 float dist(float x1, float x2, float y1, float y2);
-void draw(const State* s, const Params* p, Trace* t);
+void draw(const State* s, Trace* t);
 
 int main() {
     InitWindow(WIDTH, HEIGHT, "Three Body Problem");
@@ -74,11 +74,11 @@ int main() {
 
         ClearBackground(BLACK);
 
-        for(size_t i = 3; i < t.count; i++){
+        for(size_t i = 3; i < (size_t)t.count; i++){
             float alpha = (float)i / t.count;
             DrawLineV(t.points[i-3], t.points[i], Fade(WHITE, alpha));
         }
-        draw(&s, &p, &t);
+        draw(&s, &t);
 
         EndDrawing();
     }
@@ -155,7 +155,7 @@ float dist(float x1, float x2, float y1, float y2) {
     return sqrtf((x2-x1)*(x2-x1) + (y2-y1)*(y2-y1));
 }
 
-void draw(const State* s, const Params* p, Trace* t) {
+void draw(const State* s, Trace* t) {
     // Körper 1
     DrawCircle((int)s->x1_pos, (int)s->y1_pos, RADIUS, WHITE);
     // Körper 2
