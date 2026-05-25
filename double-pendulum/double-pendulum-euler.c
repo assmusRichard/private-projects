@@ -7,7 +7,7 @@
 #define FPS 120
 #define NUM_TRACES 5000
 
-const int samplingSteps = 10;
+const int samplingSteps = 15;
 
 typedef struct PendulumParams{
     float m1;           // Mass 1
@@ -27,6 +27,7 @@ typedef struct PhysicParams{
 
 typedef struct Trace{
     Vector2 points[NUM_TRACES];
+    int head;
     int count;
 }Trace;
 
@@ -43,7 +44,7 @@ int main(){
 
     PendulumParams penP = {.m1 = 20.0f, .m2 = 20.0f, .l1 = 200.0f, .l2 = 200.0f};
     PhysicParams phyP = {.g = 981.0f, .theta1 = 0.4f, .theta2 = 2.4f, .theta_dot1 = 0.0f, .theta_dot2 = 0.0f, .dt = 0.001};
-    Trace trace = {.count = 0};
+    Trace trace = {.head = 0, .count = 0};
 
     while(!WindowShouldClose()){
         for(int i = 0; i < samplingSteps; i++){
@@ -60,9 +61,13 @@ int main(){
         BeginDrawing();
      
         ClearBackground(BLACK);
+
         for(size_t i = 1; i < trace.count; i++){
             float alpha = (float)i / trace.count;
-            DrawLineV(trace.points[i-1], trace.points[i], Fade(WHITE, alpha));
+
+            int idxA = (trace.head - trace.count - 1 + i + NUM_TRACES) % NUM_TRACES;
+            int idxB = (trace.head - trace.count + i + NUM_TRACES) % NUM_TRACES; 
+            DrawLineV(trace.points[idxA], trace.points[idxB], Fade(WHITE, alpha));
         }
         drawPendulum(&penP, &phyP, &trace);
 
@@ -91,7 +96,8 @@ float calcTheta_ddot1(PendulumParams* penP, PhysicParams* phyP){
     float l1 = penP->l1;
     float l2 = penP->l2;
 
-    numerator = -g*(m1+m2)*sinf(theta1)-m2*g*sinf(theta1-2*theta2)-2*sinf(theta1-theta2)*(m2*l2*theta_dot2*theta_dot2+(m1+m2)*l1*theta_dot1*theta_dot1*cosf(theta1-theta2));
+    numerator = -g*(m1+m2)*sinf(theta1)-m2*g*sinf(theta1-2*theta2)-2*
+                sinf(theta1-theta2)*(m2*l2*theta_dot2*theta_dot2+(m1+m2)*l1*theta_dot1*theta_dot1*cosf(theta1-theta2));
     denominator = l1*(2*m1+m2-m2*cosf(2*theta1-2*theta2));
 
     if (fabsf(denominator) < 0.001f) denominator = copysignf(0.001f, denominator);
@@ -113,7 +119,8 @@ float calcTheta_ddot2(PendulumParams* penP, PhysicParams* phyP){
     float l1 = penP->l1;
     float l2 = penP->l2;
 
-    numerator = 2*sinf(theta1-theta2)*((m1+m2)*l1*theta_dot1*theta_dot1+g*(m1+m2)*cosf(theta1)+m2*l2*theta_dot2*theta_dot2*cosf(theta1-theta2));
+    numerator = 2*sinf(theta1-theta2)*((m1+m2)*l1*theta_dot1*theta_dot1+g*
+                (m1+m2)*cosf(theta1)+m2*l2*theta_dot2*theta_dot2*cosf(theta1-theta2));
     denominator = l2*(2*m1+m2-m2*cosf(2*theta1-2*theta2));
 
     if (fabsf(denominator) < 0.001f) denominator = copysignf(0.001f, denominator);
@@ -141,7 +148,9 @@ void drawPendulum(PendulumParams* penP, PhysicParams* phyP, Trace* t){
     DrawCircle((int)x2_pos, (int)y2_pos, (int)penP->m2, YELLOW);   
     
     // Trace
-    t->points[t->count++] = (Vector2){x2_pos, y2_pos};
-    if(t->count > NUM_TRACES) t->count = 0;
+    t->points[t->head] = (Vector2){x2_pos, y2_pos};
+    t->head = (t->head + 1) % NUM_TRACES;
+    if(t->count < NUM_TRACES) t->count++;
+    
 }
 
