@@ -1,12 +1,12 @@
-#include <stdio.h>
+
 #include <math.h>
 #include <raylib.h>
+#include <stdlib.h>
 
-#define WIDTH 1000
-#define HEIGHT 1000
+#define WIDTH GetScreenWidth()
+#define HEIGHT GetScreenHeight()
 #define FPS 60
 #define RADIUS 15.0f
-#define NUM_POINTS 3*5000
 
 typedef struct State {
     float x1_pos, y1_pos, x2_pos, y2_pos, x3_pos, y3_pos;
@@ -21,19 +21,71 @@ typedef struct Params {
 } Params;
 
 typedef struct Trace{
-    Vector2 points[NUM_POINTS];
+    Vector2* points;
+    Color* colors;
+    int head;
     int count;
+    int max;
 }Trace;
 
 void verletSpeed(State* s, Params* p);
 void calcAcceleration(State* s, Params* p);
 float dist(float x1, float x2, float y1, float y2);
 void draw(const State* s, Trace* t);
+State initBodies();
 
 int main() {
     InitWindow(WIDTH, HEIGHT, "Three Body Problem");
     SetTargetFPS(FPS);
 
+    Params p = { 
+        .G = 15.0f,
+        .m1 = 20, .m2 = 21, .m3 = 22,
+        .dt = 0.0099f
+    };
+
+    Trace t = {.head = 0, .count = 0, .max = 3 * 10000};
+    t.points = malloc(sizeof(Vector2) * t.max);
+    t.colors = malloc(sizeof(Color) * t.max);
+
+    State s = initBodies();
+
+    while(!WindowShouldClose()) {
+        if(IsKeyPressed(KEY_SPACE)){
+            s = initBodies();
+            t.head = 0;
+            t.count = 0;
+        } 
+
+        for(int i = 0; i < 200; i++){
+            verletSpeed(&s, &p);
+        }
+
+        BeginDrawing();
+
+        ClearBackground(BLACK);
+
+        DrawText("Press SPACE to reset", 25, 25, 25, RAYWHITE);
+
+        for(size_t i = 3; i < (size_t)t.count; i++){
+            float alpha = (float)i / t.count;
+
+            int idxA = (t.head - t.count - 3 + i + t.max) % t.max;
+            int idxB = (t.head - t.count + i + t.max) % t.max;
+
+            DrawLineV(t.points[idxA], t.points[idxB], Fade(t.colors[idxA], alpha));
+        }
+        draw(&s, &t);
+
+        EndDrawing();
+    }
+
+        CloseWindow();
+        return 0;
+    
+}
+
+State initBodies(){
     float centerX = WIDTH / 2.0f;
     float centerY = HEIGHT / 2.0f;
     float spawnRadius = 150.0f;
@@ -57,36 +109,10 @@ int main() {
         .x3_acc = 0.0f, .y3_acc = 0.0f
     };
 
-    Params p = { 
-        .G = 15.0f,
-        .m1 = 20, .m2 = 21, .m3 = 22,
-        .dt = 0.0099f
-    };
-
-    Trace t = {.count = 0};
-
-    while(!WindowShouldClose()) {
-        for(int i = 0; i < 200; i++){
-            verletSpeed(&s, &p);
-        }
-        
-        BeginDrawing();
-
-        ClearBackground(BLACK);
-
-        for(size_t i = 3; i < (size_t)t.count; i++){
-            float alpha = (float)i / t.count;
-            DrawLineV(t.points[i-3], t.points[i], Fade(WHITE, alpha));
-        }
-        draw(&s, &t);
-
-        EndDrawing();
-    }
-
-        CloseWindow();
-        return 0;
-    
+    return s;
 }
+
+
 
 void calcAcceleration(State* s, Params* p) {
     float d12 = fmaxf(dist(s->x1_pos, s->x2_pos, s->y1_pos, s->y2_pos), 2.0f * RADIUS);
@@ -164,7 +190,17 @@ void draw(const State* s, Trace* t) {
     DrawCircle((int)s->x3_pos, (int)s->y3_pos, RADIUS, RED);
 
 
-    t->points[t->count++] = (Vector2){s->x1_pos, s->y1_pos};
-    t->points[t->count++] = (Vector2){s->x2_pos, s->y2_pos};
-    t->points[t->count++] = (Vector2){s->x3_pos, s->y3_pos};
+    t->points[t->head] = (Vector2){s->x1_pos, s->y1_pos};
+    t->colors[t->head] = WHITE;
+    t->head = (t->head + 1) % t->max;
+
+    t->points[t->head] = (Vector2){s->x2_pos, s->y2_pos};
+    t->colors[t->head] = BLUE;
+    t->head = (t->head + 1) % t->max;
+
+    t->points[t->head] = (Vector2){s->x3_pos, s->y3_pos};
+    t->colors[t->head] = RED;
+    t->head = (t->head + 1) % t->max;
+
+    if(t->count < t->max) t->count++;
 }
